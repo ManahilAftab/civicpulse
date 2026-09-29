@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  type: ClusterIP
+  selector: { app: backend }
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: backend }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }   # zero-downtime rollouts
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        # Numeric ids so the kubelet can verify non-root (the image's user is named "app").
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      initContainers:
+        # Schema + idempotent seed before the API starts. Safe to re-run.
+        - name: migrate
+          image: civicpulse-backend
+          command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+          envFrom:
+            - configMapRef: { name: civicpulse-config }
+            - secretRef: { name: civicpulse-secrets }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      containers:
+        - name: backend
+          image: civicpulse-backend
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: { name: civicpulse-config }
+            - secretRef: { name: civicpulse-secrets }
+          # Slow start is not failure: 30 x 2 s before liveness takes over.
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            failureThreshold: 30
+            periodSeconds: 2
+          # Restarts the pod. Must NOT depend on the database.
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 10
+          # Removes the pod from the Service. SHOULD depend on the database.
+          readinessProbe:
+            httpGet: { path: /ready, port: 8000 }
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              # Leave the Service endpoints before we stop accepting connections.
+              exec: { command: ["sleep", "5"] }
+          # Requests are what the HPA divides by. Without them: <unknown>/60%.
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
