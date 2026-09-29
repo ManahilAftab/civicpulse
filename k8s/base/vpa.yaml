@@ -1,0 +1,18 @@
+# Applied separately, after the VPA CRDs are installed:
+#   kubectl apply -n civicpulse -f k8s/base/vpa.yaml
+# Kept out of kustomization.yaml so clusters without VPA can still apply the base.
+#
+# updateMode "Off": recommend only, never evict. VPA in Auto would raise the CPU
+# request, which lowers the utilisation the HPA computes (usage / request), so the
+# HPA scales in, per-pod load rises, VPA raises the request again: they fight.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: backend-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  updatePolicy:
+    updateMode: "Off"
