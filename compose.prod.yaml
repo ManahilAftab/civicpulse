@@ -72,8 +72,22 @@ services:
       resources:
         limits: { cpus: "1.0", memory: 512M }
 
-  # frontend: Partner B adds image ghcr.io/manahilaftab/civicpulse-frontend:${IMAGE_TAG},
-  #           networks [edge] only, ports "80:80".
+  frontend:
+    image: ghcr.io/manahilaftab/civicpulse-frontend:${IMAGE_TAG:?set IMAGE_TAG to a commit SHA}
+    networks: [edge]          # never on internal
+    ports:
+      - "80:8080"
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
 
 networks:
   edge: { driver: bridge }

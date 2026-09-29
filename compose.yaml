@@ -87,8 +87,24 @@ services:
       resources:
         limits: { cpus: "1.0", memory: 512M }
 
-  # frontend:   <- Partner B adds this: build ./frontend, networks: [edge] ONLY,
-  #                ports "8080:80", depends_on backend service_healthy.
+  frontend:
+    build: ./frontend
+    # edge ONLY: the internet-facing tier has no route to the database or cache.
+    #   docker compose exec frontend ping -c 1 database   -> fails: bad address 'database'
+    networks: [edge]
+    ports:
+      - "3000:8080"   # http://localhost:3000 (8080 is left free for the k3d ingress)
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
 
   # Offline triage path. Opt in with:  docker compose --profile ollama up
   ollama:
