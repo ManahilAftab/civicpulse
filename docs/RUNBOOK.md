@@ -14,8 +14,11 @@ curl -f http://localhost:8000/ready
 k3d cluster create civicpulse --agents 1 -p "8080:80@loadbalancer"
 docker build -t civicpulse-backend:dev ./backend
 k3d image import civicpulse-backend:dev -c civicpulse
+docker build -t civicpulse-frontend:dev ./frontend
+k3d image import civicpulse-frontend:dev -c civicpulse
 kubectl apply -k k8s/overlays/dev
 kubectl -n civicpulse rollout status deployment/backend
+kubectl -n civicpulse rollout status deployment/frontend
 curl -f http://civicpulse.localhost:8080/api/stats
 ```
 For a real cluster, create the Secret with real values first (see the comment in
