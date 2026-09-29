@@ -1,0 +1,98 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [dev]
+
+# Least privilege: CI only reads the repository. It never publishes anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-lint-and-type:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements-dev.txt }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests alembic
+      - run: ruff format --check app tests alembic
+      - run: mypy app
+
+  backend-test:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: backend } }
+    env:
+      TRIAGE_PROVIDER: simulated   # deterministic: no network, no flaky LLM
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements-dev.txt }
+      - run: pip install -r requirements-dev.txt
+      - run: pytest   # coverage gate (>= 65%) lives in pyproject.toml
+
+  # Partner B: add frontend lint/type/test jobs here (eslint, tsc --noEmit, vitest).
+
+  build-and-scan:
+    runs-on: ubuntu-24.04
+    needs: [backend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image (not pushed — a PR must not publish artifacts)
+        run: docker build -t civicpulse-backend:ci ./backend
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: civicpulse-backend:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  integration:
+    runs-on: ubuntu-24.04
+    needs: [backend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare env
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-only-password/' .env
+          sed -i 's/^TRIAGE_PROVIDER=.*/TRIAGE_PROVIDER=simulated/' .env
+          sed -i 's/^RATE_LIMIT_REQUESTS=.*/RATE_LIMIT_REQUESTS=1000/' .env
+      - name: Start stack
+        run: docker compose up -d --build
+      - name: Wait for /ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/ready; then echo; exit 0; fi
+            sleep 2
+          done
+          docker compose ps; docker compose logs; exit 1
+      - name: POST a complaint, GET it back, assert the category
+        run: |
+          id=$(curl -fsS -X POST http://localhost:8000/api/complaints \
+                 -H 'Content-Type: application/json' \
+                 -d '{"text":"Burst water main flooding Street 12 since fajr","location":"G-9/2, Islamabad"}' \
+               | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+          category=$(curl -fsS "http://localhost:8000/api/complaints/$id" \
+               | python3 -c 'import sys,json; print(json.load(sys.stdin)["category"])')
+          echo "category=$category"
+          test "$category" = "water"
+      - name: Stats cache goes MISS then HIT
+        run: |
+          first=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
+          second=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
+          echo "$first / $second"
+          echo "$first" | grep -qi miss
+          echo "$second" | grep -qi hit
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
