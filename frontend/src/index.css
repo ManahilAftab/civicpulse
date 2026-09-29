@@ -1,0 +1,6 @@
+:root { font-family: Inter, "Segoe UI", system-ui, sans-serif; color: #17332d; background: #f3f7f5; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .6; }
