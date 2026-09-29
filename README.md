@@ -79,7 +79,17 @@ Full contract: [docs/API.md](docs/API.md).
 
 ## Screenshots
 
-_Add to `docs/evidence/`: submit view, dashboard, stats with X-Cache, network isolation failing._
+| Submit | Dashboard | Stats (X-Cache) |
+|---|---|---|
+| ![Submit](docs/evidence/submit.png) | ![Dashboard](docs/evidence/dashboard.png) | ![Stats](docs/evidence/stats.png) |
+
+**Network isolation:** the frontend cannot reach the database.
+
+![Network isolation](docs/evidence/network-isolation.png)
+
+**Kubernetes:** all pods running in the `civicpulse` namespace.
+
+![Pods](docs/evidence/pods.png)
 
 ## Repository
 
@@ -101,7 +111,7 @@ pytest                      # 73 tests, deterministic (TRIAGE_PROVIDER=simulated
 
 ## Team
 
-- **Maha** — backend, AI triage layer, data, cache
-- **Asifa Minahil** — frontend, containers, Kubernetes, CI
+- **Manahil Aftab** — backend, AI triage layer, data, cache, Docker/Compose, Kubernetes, CI/CD, docs
+- **Asifa Minahil** — frontend: Submit, Dashboard and Stats views
 
 Backend framework: FastAPI. AI assistance is disclosed in [docs/AI-USAGE.md](docs/AI-USAGE.md).
