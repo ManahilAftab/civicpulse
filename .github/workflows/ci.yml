@@ -48,13 +48,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build backend image (not pushed — a PR must not publish artifacts)
         run: docker build -t civicpulse-backend:ci ./backend
-      - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: civicpulse-backend:ci
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+      - name: Trivy scan (fail on HIGH/CRITICAL with a fix available)
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL --ignore-unfixed
+          --exit-code 1 civicpulse-backend:ci
 
   integration:
     runs-on: ubuntu-24.04
