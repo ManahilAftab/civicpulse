@@ -1,0 +1,31 @@
+[project]
+name = "civicpulse-backend"
+version = "0.1.0"
+description = "CivicPulse complaint intake and triage API"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=65"
+
+[tool.coverage.run]
+omit = ["app/seed_data.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101", "B008"]  # asserts in tests; FastAPI Depends() in defaults
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
+"app/providers/triage/simulated.py" = ["S311"]  # non-crypto randomness is the point
+"app/seed_data.py" = ["E501"]  # prose data, long lines are clearer than wrapped strings
+"app/providers/triage/llm.py" = ["E501"]  # prompt text
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]

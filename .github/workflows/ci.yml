@@ -1,0 +1,150 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [dev]
+
+# Least privilege: CI only reads the repository. It never publishes anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-lint-and-type:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements-dev.txt }
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests alembic
+      - run: ruff format --check app tests alembic
+      - run: mypy app
+
+  backend-test:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: backend } }
+    env:
+      TRIAGE_PROVIDER: simulated   # deterministic: no network, no flaky LLM
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements-dev.txt }
+      - run: pip install -r requirements-dev.txt
+      - run: pytest   # coverage gate (>= 65%) lives in pyproject.toml
+
+  frontend-lint-and-type:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint                         # oxlint
+      - run: npx tsc --noEmit -p tsconfig.app.json
+
+  frontend-test:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm test                             # vitest run
+
+  manifests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validate prod and dev overlays
+        run: |
+          kubectl kustomize k8s/overlays/prod | kubeconform -strict -summary -kubernetes-version 1.30.0
+          kubectl kustomize k8s/overlays/dev  | kubeconform -strict -summary -kubernetes-version 1.30.0
+          kubeconform -summary -ignore-missing-schemas k8s/base/vpa.yaml
+
+  build-and-scan:
+    runs-on: ubuntu-24.04
+    needs: [backend-test, frontend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images (not pushed — a PR must not publish artifacts)
+        run: |
+          docker build -t civicpulse-backend:ci ./backend
+          docker build -t civicpulse-frontend:ci ./frontend
+      - name: Trivy scan (fail on HIGH/CRITICAL with a fix available)
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL --ignore-unfixed
+          --exit-code 1 civicpulse-backend:ci
+      - name: Trivy scan frontend
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL --ignore-unfixed
+          --exit-code 1 civicpulse-frontend:ci
+
+  integration:
+    runs-on: ubuntu-24.04
+    needs: [backend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare env
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-only-password/' .env
+          sed -i 's/^TRIAGE_PROVIDER=.*/TRIAGE_PROVIDER=simulated/' .env
+          sed -i 's/^RATE_LIMIT_REQUESTS=.*/RATE_LIMIT_REQUESTS=1000/' .env
+      - name: Start stack
+        run: docker compose up -d --build
+      - name: Wait for /ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/ready; then echo; exit 0; fi
+            sleep 2
+          done
+          docker compose ps; docker compose logs; exit 1
+      - name: POST a complaint, GET it back, assert the category
+        run: |
+          id=$(curl -fsS -X POST http://localhost:8000/api/complaints \
+                 -H 'Content-Type: application/json' \
+                 -d '{"text":"Burst water main flooding Street 12 since fajr","location":"G-9/2, Islamabad"}' \
+               | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+          category=$(curl -fsS "http://localhost:8000/api/complaints/$id" \
+               | python3 -c 'import sys,json; print(json.load(sys.stdin)["category"])')
+          echo "category=$category"
+          test "$category" = "water"
+      - name: Frontend serves the app and proxies /api to the backend
+        run: |
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/health && break; sleep 2; done
+          curl -fsS http://localhost:3000/ | grep -qi '<div id="root">'
+          curl -fsS http://localhost:3000/api/stats | python3 -c 'import sys,json; assert json.load(sys.stdin)["total"] >= 30'
+      - name: Network isolation — the frontend cannot reach the database
+        run: |
+          if docker compose exec -T frontend ping -c 1 -W 2 database; then
+            echo "frontend reached database: segmentation broken"; exit 1
+          fi
+          echo "OK: frontend has no route to database"
+      - name: Stats cache goes MISS then HIT (a write invalidates it first)
+        run: |
+          curl -fsS -o /dev/null -X POST http://localhost:8000/api/complaints \
+            -H 'Content-Type: application/json' \
+            -d '{"text":"Streetlight not working in our lane at night","location":"G-9/2, Islamabad"}'
+          first=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
+          second=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
+          echo "$first / $second"
+          echo "$first" | grep -qi miss
+          echo "$second" | grep -qi hit
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

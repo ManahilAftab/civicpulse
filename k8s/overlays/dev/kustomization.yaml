@@ -1,0 +1,14 @@
+# Local k3d/kind cluster, images built locally and imported:
+#   docker build -t civicpulse-backend:dev ./backend
+#   k3d image import civicpulse-backend:dev -c civicpulse
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: civicpulse-backend
+    newName: civicpulse-backend
+    newTag: dev
+  - name: civicpulse-frontend
+    newName: civicpulse-frontend
+    newTag: dev

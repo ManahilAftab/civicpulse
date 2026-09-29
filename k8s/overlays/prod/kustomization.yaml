@@ -1,0 +1,15 @@
+# Deployed by immutable reference. CD sets the tag to the commit SHA:
+#   cd k8s/overlays/prod && kustomize edit set image \
+#     civicpulse-backend=ghcr.io/manahilaftab/civicpulse-backend:${GITHUB_SHA}
+# "latest" may be pushed; it is never deployed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: civicpulse-backend
+    newName: ghcr.io/manahilaftab/civicpulse-backend
+    newTag: set-by-cd
+  - name: civicpulse-frontend
+    newName: ghcr.io/manahilaftab/civicpulse-frontend
+    newTag: set-by-cd
