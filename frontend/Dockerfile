@@ -9,6 +9,9 @@ RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
 
+# Pull in OS security fixes released after the base image was built (Trivy gate).
+RUN apk upgrade --no-cache
+
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 

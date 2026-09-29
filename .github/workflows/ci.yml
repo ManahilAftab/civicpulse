@@ -39,7 +39,26 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: pytest   # coverage gate (>= 65%) lives in pyproject.toml
 
-  # Partner B: add frontend lint/type/test jobs here (eslint, tsc --noEmit, vitest).
+  frontend-lint-and-type:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint                         # oxlint
+      - run: npx tsc --noEmit -p tsconfig.app.json
+
+  frontend-test:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm test                             # vitest run
 
   manifests:
     runs-on: ubuntu-24.04
@@ -57,16 +76,23 @@ jobs:
 
   build-and-scan:
     runs-on: ubuntu-24.04
-    needs: [backend-test]
+    needs: [backend-test, frontend-test]
     steps:
       - uses: actions/checkout@v4
-      - name: Build backend image (not pushed — a PR must not publish artifacts)
-        run: docker build -t civicpulse-backend:ci ./backend
+      - name: Build images (not pushed — a PR must not publish artifacts)
+        run: |
+          docker build -t civicpulse-backend:ci ./backend
+          docker build -t civicpulse-frontend:ci ./frontend
       - name: Trivy scan (fail on HIGH/CRITICAL with a fix available)
         run: >
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL --ignore-unfixed
           --exit-code 1 civicpulse-backend:ci
+      - name: Trivy scan frontend
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.56.2 image --severity HIGH,CRITICAL --ignore-unfixed
+          --exit-code 1 civicpulse-frontend:ci
 
   integration:
     runs-on: ubuntu-24.04
@@ -98,8 +124,22 @@ jobs:
                | python3 -c 'import sys,json; print(json.load(sys.stdin)["category"])')
           echo "category=$category"
           test "$category" = "water"
-      - name: Stats cache goes MISS then HIT
+      - name: Frontend serves the app and proxies /api to the backend
         run: |
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/health && break; sleep 2; done
+          curl -fsS http://localhost:3000/ | grep -qi '<div id="root">'
+          curl -fsS http://localhost:3000/api/stats | python3 -c 'import sys,json; assert json.load(sys.stdin)["total"] >= 30'
+      - name: Network isolation — the frontend cannot reach the database
+        run: |
+          if docker compose exec -T frontend ping -c 1 -W 2 database; then
+            echo "frontend reached database: segmentation broken"; exit 1
+          fi
+          echo "OK: frontend has no route to database"
+      - name: Stats cache goes MISS then HIT (a write invalidates it first)
+        run: |
+          curl -fsS -o /dev/null -X POST http://localhost:8000/api/complaints \
+            -H 'Content-Type: application/json' \
+            -d '{"text":"Streetlight not working in our lane at night","location":"G-9/2, Islamabad"}'
           first=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
           second=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
           echo "$first / $second"
