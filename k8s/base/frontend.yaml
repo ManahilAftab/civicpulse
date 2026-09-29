@@ -7,7 +7,7 @@ spec:
   selector: { app: frontend }
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080   # nginx runs as non-root on 8080
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -28,12 +28,12 @@ spec:
         - name: frontend
           image: civicpulse-frontend
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           readinessProbe:
-            httpGet: { path: /, port: 80 }
+            httpGet: { path: /health, port: 8080 }
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /, port: 80 }
+            httpGet: { path: /health, port: 8080 }
             periodSeconds: 10
           resources:
             requests: { cpu: 50m, memory: 32Mi }
