@@ -103,10 +103,26 @@ weights then live in the `ollama_models` volume.
 
 ## 8. The failure
 
-_TODO (Maha): write your own. Suggested, if it fits: installing Docker on Ubuntu 24.04 failed
-inside `apt-get update`. What I wrongly believed first: that the Docker install script was
-broken. The line that told the truth:
-`E: The repository 'https://packages.microsoft.com/ubuntu/22.04/mssql-server-2022 jammy InRelease' is not signed.`
-— an old SQL Server (and Yarn) apt source with a missing key was failing the whole update.
-Fix: moved those source files to `/etc/apt/disabled-sources/`, `apt update` came back clean,
-Docker installed. Rewrite in your own words and say how long it actually took._
+**Symptom.** `docker compose up --build` failed while building the backend image:
+
+The `migrate` build failed the same way on `COPY requirements.txt .`.
+
+**What I wrongly believed first.** That the Dockerfile was wrong: a bad `COPY` path, or the
+wrong build context (`build: ./backend`) in `compose.yaml`. I spent [TIME] re-reading the
+Dockerfile and compose file, and both were correct.
+
+**What told me the truth.** Looking at the working tree instead of the config:
+
+`requirements.txt`, `alembic.ini` and `pyproject.toml` were simply not there. The backend PR
+(#2) had not been merged into `dev` yet. When I ran `git checkout dev` to start the Docker
+branch, Git made the working tree match `dev`, which at that point only contained
+`.gitignore`, so it removed every tracked backend file from the folder. Docker was right:
+the files were not in the build context.
+
+**Fix.** Merged PR #2 into `dev`, set my new untracked files aside with `git stash -u`, ran
+`git checkout dev && git pull`, recreated the branch with `git checkout -B feat/docker-compose`,
+restored the files, and the build passed.
+
+**Lesson.** The working tree is whatever branch is checked out, so merge order matters. And a
+Docker "not found" during `COPY` is a statement about the build context: check what is
+actually in the folder before debugging the Dockerfile.
