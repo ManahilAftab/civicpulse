@@ -1,0 +1,27 @@
+16:55:52 NAME      REFERENCE            TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+16:55:52 backend   Deployment/backend   cpu: 5%/60%   2         10        2          9m4s
+16:57:34 backend   Deployment/backend   cpu: 52%/60%   2         10        2          10m
+16:57:49 backend   Deployment/backend   cpu: 210%/60%   2         10        2          11m
+16:58:04 backend   Deployment/backend   cpu: 438%/60%   2         10        6          11m
+16:58:19 backend   Deployment/backend   cpu: 440%/60%   2         10        10         11m
+16:58:49 backend   Deployment/backend   cpu: 417%/60%   2         10        10         12m
+16:59:04 backend   Deployment/backend   cpu: 420%/60%   2         10        10         12m
+16:59:19 backend   Deployment/backend   cpu: 429%/60%   2         10        10         12m
+16:59:34 backend   Deployment/backend   cpu: 431%/60%   2         10        10         12m
+17:00:04 backend   Deployment/backend   cpu: 436%/60%   2         10        10         13m
+17:00:19 backend   Deployment/backend   cpu: 430%/60%   2         10        10         13m
+17:00:34 backend   Deployment/backend   cpu: 431%/60%   2         10        10         13m
+17:00:49 backend   Deployment/backend   cpu: 448%/60%   2         10        10         14m
+17:01:04 backend   Deployment/backend   cpu: 454%/60%   2         10        10         14m
+17:01:19 backend   Deployment/backend   cpu: 447%/60%   2         10        10         14m
+17:01:35 backend   Deployment/backend   cpu: 445%/60%   2         10        10         14m
+17:01:50 backend   Deployment/backend   cpu: 455%/60%   2         10        10         15m
+17:02:20 backend   Deployment/backend   cpu: 160%/60%   2         10        10         15m
+17:02:35 backend   Deployment/backend   cpu: 6%/60%     2         10        10         15m
+17:03:05 backend   Deployment/backend   cpu: 5%/60%     2         10        10         16m
+17:06:05 backend   Deployment/backend   cpu: 4%/60%     2         10        10         19m
+17:06:20 backend   Deployment/backend   cpu: 5%/60%     2         10        10         19m
+17:07:20 backend   Deployment/backend   cpu: 5%/60%     2         10        10         20m
+17:07:35 backend   Deployment/backend   cpu: 5%/60%     2         10        2          20m
+17:07:50 backend   Deployment/backend   cpu: 6%/60%     2         10        2          21m
+17:08:05 backend   Deployment/backend   cpu: 5%/60%     2         10        2          21m
