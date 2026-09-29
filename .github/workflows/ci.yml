@@ -135,8 +135,11 @@ jobs:
             echo "frontend reached database: segmentation broken"; exit 1
           fi
           echo "OK: frontend has no route to database"
-      - name: Stats cache goes MISS then HIT
+      - name: Stats cache goes MISS then HIT (a write invalidates it first)
         run: |
+          curl -fsS -o /dev/null -X POST http://localhost:8000/api/complaints \
+            -H 'Content-Type: application/json' \
+            -d '{"text":"Streetlight not working in our lane at night","location":"G-9/2, Islamabad"}'
           first=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
           second=$(curl -fsS -D - -o /dev/null http://localhost:8000/api/stats | grep -i '^x-cache' | tr -d '\r')
           echo "$first / $second"
