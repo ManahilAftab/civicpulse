@@ -1,0 +1,11 @@
+18:32:04 load start concurrency=10
+  Requests/sec:	147.3212
+  [200]	13274 responses
+18:33:35 load start concurrency=40
+  Requests/sec:	200.1970
+  0.674 [200]	|■
+  [200]	18085 responses
+18:35:05 load start concurrency=80
+  Requests/sec:	230.0409
+  [200]	20825 responses
+18:36:36 load stopped

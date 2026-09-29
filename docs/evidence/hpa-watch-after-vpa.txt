@@ -1,0 +1,23 @@
+18:32:11 NAME      REFERENCE            TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+18:32:11 backend   Deployment/backend   cpu: 1%/60%   2         10        2          105m
+18:32:14 backend   Deployment/backend   cpu: 1%/60%   2         10        2          105m
+18:32:29 backend   Deployment/backend   cpu: 44%/60%   2         10        2          105m
+18:32:44 backend   Deployment/backend   cpu: 180%/60%   2         10        2          105m
+18:32:59 backend   Deployment/backend   cpu: 181%/60%   2         10        6          106m
+18:33:14 backend   Deployment/backend   cpu: 182%/60%   2         10        6          106m
+18:33:29 backend   Deployment/backend   cpu: 180%/60%   2         10        6          106m
+18:33:44 backend   Deployment/backend   cpu: 177%/60%   2         10        6          106m
+18:33:59 backend   Deployment/backend   cpu: 172%/60%   2         10        10         107m
+18:34:14 backend   Deployment/backend   cpu: 150%/60%   2         10        10         107m
+18:34:29 backend   Deployment/backend   cpu: 147%/60%   2         10        10         107m
+18:34:44 backend   Deployment/backend   cpu: 134%/60%   2         10        10         107m
+18:34:59 backend   Deployment/backend   cpu: 113%/60%   2         10        10         108m
+18:35:14 backend   Deployment/backend   cpu: 108%/60%   2         10        10         108m
+18:35:29 backend   Deployment/backend   cpu: 102%/60%   2         10        10         108m
+18:35:45 backend   Deployment/backend   cpu: 120%/60%   2         10        10         108m
+18:36:00 backend   Deployment/backend   cpu: 120%/60%   2         10        10         109m
+18:36:15 backend   Deployment/backend   cpu: 126%/60%   2         10        10         109m
+18:36:30 backend   Deployment/backend   cpu: 118%/60%   2         10        10         109m
+18:36:45 backend   Deployment/backend   cpu: 105%/60%   2         10        10         109m
+18:37:00 backend   Deployment/backend   cpu: 12%/60%    2         10        10         110m
+18:37:15 backend   Deployment/backend   cpu: 1%/60%     2         10        10         110m
