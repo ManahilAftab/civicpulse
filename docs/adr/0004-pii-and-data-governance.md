@@ -12,8 +12,18 @@ free tiers (e.g. Gemini) may use inputs to improve models.
   (`build_messages` in `providers/triage/llm.py`).
 - **Sent:** complaint text and location, because triage is impossible without them.
   Location is sector-level in practice (e.g. "G-9/2, Islamabad").
-- **Chosen provider:** Groq. *(TODO before submitting: read Groq's current data-use and
-  retention terms, and record here exactly what they say and the date you checked.)*
+- **Chosen provider:** Groq. What Groq's own terms say (checked 29 September 2026):
+  - Inference inputs and outputs are **not retained by default**; they are logged only
+    temporarily when Groq is troubleshooting reliability problems or investigating abuse
+    (console.groq.com/docs/your-data).
+  - The Groq Services Agreement says Groq may **not use inputs or outputs to train or
+    fine-tune models** unless the customer explicitly allows it
+    (console.groq.com/docs/legal/services-agreement).
+  - Any customer can switch on **Zero Data Retention** in the Console's Data Controls
+    page, which removes even that troubleshooting/abuse logging.
+  - Residual exposure we accept: requests are processed by a US company, so complaint
+    text and location leave Pakistan. That is acceptable for a coursework system with
+    seeded data; a real municipality should enable ZDR or use `TRIAGE_PROVIDER=ollama`.
 - **Offline option:** `TRIAGE_PROVIDER=ollama` keeps all data on the host; use it wherever
   sending citizen text to a third party is not acceptable.
 - **Logs:** complaint text and contact details are never logged — only ids, provider,
