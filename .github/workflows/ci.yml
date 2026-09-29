@@ -41,6 +41,20 @@ jobs:
 
   # Partner B: add frontend lint/type/test jobs here (eslint, tsc --noEmit, vitest).
 
+  manifests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validate prod and dev overlays
+        run: |
+          kubectl kustomize k8s/overlays/prod | kubeconform -strict -summary -kubernetes-version 1.30.0
+          kubectl kustomize k8s/overlays/dev  | kubeconform -strict -summary -kubernetes-version 1.30.0
+          kubeconform -summary -ignore-missing-schemas k8s/base/vpa.yaml
+
   build-and-scan:
     runs-on: ubuntu-24.04
     needs: [backend-test]
