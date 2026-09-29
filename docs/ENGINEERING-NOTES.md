@@ -42,10 +42,37 @@ that always raise, return malformed JSON or hang (`backend/tests/fakes.py`). The
 injected as a function so tests record the sleep instead of waiting.
 
 ## 5. HPA lag
-_TODO (Partner B)._
+
+Measured on k3d (2 nodes), HPA `k8s/base/hpa.yaml` (target 60 % CPU, min 2, max 10), backend
+requests `cpu: 100m` (`k8s/base/backend.yaml`). Raw data: `docs/evidence/hpa-watch.txt`,
+`docs/evidence/load-phases.txt`; chart: `docs/evidence/hpa-scaling.png`.
+
+- Load started **16:57:26** (hey, 10 concurrent users on `GET /api/complaints`).
+- CPU crossed the target at 16:57:49 (210 %). First scale-out **2 → 6 at 16:58:04**: **~38 s**
+  after load arrived. **6 → 10 at 16:58:19**, then pinned at `maxReplicas`.
+- Where the time went: metrics-server scrapes about every 15 s, the HPA controller evaluates
+  every 15 s, so up to ~30 s pass before the controller even sees the load; then new pods
+  pull nothing (image already imported) but still run the migrate init container and must
+  pass the startup and readiness probes before the Service sends them traffic.
+- At 10 replicas CPU stayed ~430–455 % of request, and throughput flattened at ~190 req/s
+  whether 40 or 80 users were offered: the cap and the laptop's cores were the limit, not the
+  HPA. All 43,156 requests returned 200.
+- Load stopped **17:01:57**; CPU fell to 6 % by 17:02:35, but replicas held at 10 until
+  **17:07:35** and then dropped **10 → 2**: exactly the 300 s `scaleDown` stabilisation window.
+- What would reduce the lag: a shorter metrics resolution, pre-warming (`minReplicas` sized
+  for known peaks), keeping startup cheap (move migrations to a one-off Job instead of an
+  init container in every pod), and scaling on a leading signal such as request rate
+  instead of CPU. Autoscaling reacts; it doesn't replace capacity planning.
 
 ## 6. Why VPA is in Off mode
-_TODO (Partner B)._
+
+`k8s/base/vpa.yaml` sets `updateMode: "Off"`: recommend only, never evict. Our HPA scales on
+CPU utilisation, which is usage ÷ request. VPA in Auto also acts on CPU and changes the
+request: it raises the request, which lowers the utilisation the HPA computes, so the HPA
+scales in; fewer pods means more load per pod, so VPA raises the request again. The two
+controllers act on the same signal and fight. Recommender mode plus a human decision (read
+the Target / bounds, then change `resources.requests` in a reviewed commit) is the usual
+practice for exactly this reason.
 
 ## 7. `internal: true` and the service that calls the LLM
 
