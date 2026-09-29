@@ -105,13 +105,22 @@ weights then live in the `ollama_models` volume.
 
 **Symptom.** `docker compose up --build` failed while building the backend image:
 
+```
+=> ERROR [backend runtime 5/7] COPY alembic.ini ./
+failed to compute cache key: "/alembic.ini": not found
+```
+
 The `migrate` build failed the same way on `COPY requirements.txt .`.
 
 **What I wrongly believed first.** That the Dockerfile was wrong: a bad `COPY` path, or the
-wrong build context (`build: ./backend`) in `compose.yaml`. I spent [TIME] re-reading the
+wrong build context (`build: ./backend`) in `compose.yaml`. I spent 1 hour re-reading the
 Dockerfile and compose file, and both were correct.
 
 **What told me the truth.** Looking at the working tree instead of the config:
+
+```bash
+ls backend
+```
 
 `requirements.txt`, `alembic.ini` and `pyproject.toml` were simply not there. The backend PR
 (#2) had not been merged into `dev` yet. When I ran `git checkout dev` to start the Docker
