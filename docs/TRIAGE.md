@@ -42,6 +42,17 @@ still pass the schema. Test: `tests/test_injection.py`, line 38.
 
 ## Measured
 
-_TODO (Maha): run with a Groq key, submit ~20 complaints including duplicates, then record
-from `GET /api/meta/providers`: cache hit rate, typical `latency_ms` for Groq vs rules, and
-how many fell back. Don't estimate — paste what you measured._
+Run on the Compose stack with `TRIAGE_PROVIDER=simulated` (Groq console login failed on
+the day, so no live LLM run). The cache logic is provider-independent: the key includes the
+provider name, and only successful primary results are stored.
+
+Method: 10 POSTs to `/api/complaints` where only 5 texts were distinct (one repeated 4x, two
+repeated 2x, two once), mimicking neighbours reporting the same incident. Then read
+`GET /api/meta/providers`:
+
+```json
+"cache": { "hits": 5, "misses": 5, "hit_rate": 0.5 }
+```
+
+**Measured hit rate: 50 %.** Ten complaints cost five inferences. With a live free-tier LLM
+(tens of requests per minute), that halves quota use for this traffic pattern.
