@@ -74,6 +74,21 @@ controllers act on the same signal and fight. Recommender mode plus a human deci
 the Target / bounds, then change `resources.requests` in a reviewed commit) is the usual
 practice for exactly this reason.
 
+### The VPA loop we actually ran
+
+1. Guessed requests in `k8s/base/backend.yaml`: `cpu: 100m`, `memory: 128Mi`.
+2. Load test (hey, 3 min, 40 users), then `kubectl describe vpa backend-vpa`
+   (`docs/evidence/vpa-recommendation.txt`): Target `cpu: 511m`, `memory: 250Mi`;
+   Lower Bound `25m`; the Upper Bound was huge because the recommender had only minutes of
+   history, which is exactly why a human reads it rather than letting it act.
+3. Updated requests to `cpu: 500m`, `memory: 256Mi` (limits `cpu: 1`, `memory: 512Mi`,
+   since a request cannot exceed its limit).
+4. Re-ran the same HPA load test (`docs/evidence/hpa-watch-after-vpa.txt`).
+5. What changed: with the 100m guess, utilisation peaked at ~450 % and stayed ~430–455 %
+   even at 10 replicas, so the HPA saw every pod as 4.5x overloaded. With 500m it peaked at
+   ~180 % and fell to ~102–126 % at 10 replicas: the percentage now reflects real headroom,
+   and each pod may use up to a full core. Our 80-user load still needed `maxReplicas`.
+
 ## 7. `internal: true` and the service that calls the LLM
 
 `internal: true` (`compose.yaml`, line 112) removes outbound routes for `database` and
